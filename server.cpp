@@ -19,7 +19,7 @@
 using namespace std;
 
 int nConns;
-struct poolfd peers[MAX_CONCURRENCY_LIMIT+1];
+struct pollfd peers[MAX_CONCURRENCY_LIMIT+1];
 void Error(const char * format, ...) {
 	char msg[4096];
 	va_list argptr;
@@ -50,7 +50,6 @@ void RemoveConnection(int i) {
 	close(peers[i].fd);
 	if (i < nConns) {
 		memmove(peers + i, peers + i + 1, (nConns-i) * sizeof(struct pollfd));
-		memmove(connStat + i, connStat + i + 1, (nConns-i) * sizeof(struct CONN_STAT));
 	}
 	nConns--;
 
@@ -116,7 +115,7 @@ int checkComm(string s) {
 		Error("Invalid Command");
 	}
 }
-int regist(char* username, char* psw ){
+int userRegist(char* username, char* psw ){
 	if(strlen(username) > 8 || strlen(username)<4 || strlen(psw)>8 || strlen(psw)<4){
 		Log("The length of username and password must longer than 4 and shorter than 8.");
 	}
@@ -135,7 +134,7 @@ int regist(char* username, char* psw ){
 		return 0;
 	}
 }
-int loggingin(string username, string psw){
+int userLogin(string username, string psw){
 	ifstream userData;
 	string name;
 	string pwd;
@@ -153,7 +152,7 @@ int loggingin(string username, string psw){
 	}
 	return 0;
 }
-void logout(int i){
+void userLogout(int i){
 	RemoveConnection(i);
 }
 
@@ -171,7 +170,7 @@ void Set_Server(int svrPort, int maxConcurrency) {
   serverAddr.sin_family = AF_INET;
   serverAddr.sin_port = htons((unsigned short) svrPort);
   serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-
+	int optval = 1;
   int r = setsockopt(listenFD, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
 	if (r != 0) {
 		Error("Cannot enable SO_REUSEADDR option.");
@@ -182,7 +181,7 @@ void Set_Server(int svrPort, int maxConcurrency) {
     Error("Cannot bind to port %d", svrPort);
   }
 
-  if(listen(listenFd, 16) != 0) {
+  if(listen(listenFD, 16) != 0) {
     Error("Cannot listen to port %d.", svrPort);
   }
   nConns = 0;
@@ -213,22 +212,22 @@ void Set_Server(int svrPort, int maxConcurrency) {
     }
     for(int i=1; i<= nConns; i++) {
       if(peers[i].revents & (POLLRDNORM | POLLERR | POLLHUP)) {
-        int fd = peers[i];
-        buf = "";
-        int recvd= Recv_NonBlocking(fd, recvBuf, &peers[i]) <0);
+        int fd = peers[i].fd;
+        recvBuf = "";
+        int recvd= Recv_NonBlocking(fd, (string)recvBuf, &peers[i]);
         if(recvd < 0) {
           RemoveConnection(i); // Remember to clear the loggedInUser;
           goto NEXT_CONNECTION;
 
         } else {
-          int commID  = checkComm(buf);
+          int commID  = checkComm(recvBuf);
           switch(commID){
             case 1:
-							userRegist();
+							//userRegist('aaa','bbb');
             case 2:
-              userLogin();
+            //  userLogin("aaa","bbb");
             case 3:
-              userLogout();
+            //  userLogout(fd);
             case 4:
               ;
             case 5:
